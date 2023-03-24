@@ -1,27 +1,37 @@
 {
     "name": "Timelines",
-    "version": "0.3.3",
+    "version": "0.3.3-cr4igo",
+    "type": "module",
     "description": "Create a timeline view of all notes with the specified combination of tags",
     "main": "main.js",
+    "module": "",
     "scripts": {
-        "dev": "rollup --config rollup.config.js -w",
-        "build": "rollup --config rollup.config.js"
+        "dev": "rollup --bundleconfigascjs --config rollup.config.js -w",
+        "build": "rollup --bundleconfigascjs --config rollup.config.js"
     },
     "keywords": [],
     "author": "",
     "license": "MIT",
     "devDependencies": {
-        "@rollup/plugin-commonjs": "^15.1.0",
-        "@rollup/plugin-node-resolve": "^9.0.0",
-        "@rollup/plugin-typescript": "^6.0.0",
-        "@types/node": "^14.14.2",
-        "obsidian": "^0.12.11",
-        "rollup": "^2.32.1",
-        "tslib": "^2.0.3",
-        "typescript": "^4.0.3"
+        "@rollup/plugin-commonjs": "^24.0.0",
+        "@rollup/plugin-node-resolve": "^15.0.1",
+        "@rollup/plugin-typescript": "^11.0.0",
+        "rollup-plugin-postcss-modules": "^2.1.1",
+        "@types/node": "^18.11.18",
+        "obsidian": "https://github.com/obsidianmd/obsidian-api/tarball/master",
+        "rollup": "^3.10.0",
+        "tslib": "^2.4.1",
+        "typescript": "^4.9.4",
+        "rollup-plugin-typescript2":"^0.34.1",
+        "postcss-url": "^10.1.3",
+        "postcss-preset-env": "^7.8.3",
+        "rollup-plugin-peer-deps-external": "^2.2.4"
     },
     "dependencies": {
-        "rollup-plugin-styles": "^3.14.1",
-        "vis-timeline": "^7.4.6"
+        "autoprefixer": "^10.4.13",
+        "cssnano": "^5.1.14",
+        "postcss": "^8.4.21",
+        "vis-data": "7.1.4",
+        "vis-timeline": "^7.7.0"
     }
 }

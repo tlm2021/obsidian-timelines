@@ -18,6 +18,10 @@ export function parseTag(tag: string, tagList: string[]) {
 	}
 }
 
+export function getNoteTags(file: TFile, metadataCache: MetadataCache) {
+	return getAllTags(metadataCache.getFileCache(file)).map(e => e.slice(1, e.length));
+}
+
 export function FilterMDFiles(file: TFile, tagList: String[], metadataCache: MetadataCache) {
 	if (!tagList || tagList.length === 0) {
 		return true;
