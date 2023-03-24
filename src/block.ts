@@ -1,16 +1,18 @@
 //import Gallery from './svelte/Gallery.svelte'
 import type { TimelinesSettings, AllNotesData } from './types';
 import { RENDER_TIMELINE } from './constants';
-import type { TFile, MarkdownView, MetadataCache, Vault } from 'obsidian';
+import { TFile, MarkdownView, MetadataCache, Vault } from 'obsidian';
 import { Timeline } from "vis-timeline/esnext";
 import { DataSet } from "vis-data";
+import { FilterMDFiles, createDate, getImgUrl, parseTag, getNoteTags } from './utils';
+//import "../node_modules/vis-timeline/styles/vis-timeline-graph2d.css";
 import "vis-timeline/styles/vis-timeline-graph2d.css";
-import { FilterMDFiles, createDate, getImgUrl, parseTag } from './utils';
+import styles from './styles.css';
 
 export class TimelineProcessor {
 
 	async insertTimelineIntoCurrentNote(sourceView: MarkdownView, settings: TimelinesSettings, vaultFiles: TFile[], fileCache: MetadataCache, appVault: Vault) {
-		let editor = sourceView.sourceMode.cmEditor;
+		let editor = sourceView.editor;
 		if (editor) {
 			const source = editor.getValue();
 			let match = RENDER_TIMELINE.exec(source);
@@ -19,7 +21,7 @@ export class TimelineProcessor {
 
 				let div = document.createElement('div');
 				let rendered = document.createElement('div');
-				rendered.addClass('timeline-rendered');
+				rendered.addClass(styles['timeline-rendered']);
 				rendered.setText(new Date().toString());
 
 				div.appendChild(document.createComment(`TIMELINE BEGIN tags='${match[1]}'`));
@@ -34,7 +36,7 @@ export class TimelineProcessor {
 
 	async run(source: string, el: HTMLElement, settings: TimelinesSettings, vaultFiles: TFile[], fileCache: MetadataCache, appVault: Vault, visTimeline: boolean) {
 
-		let args = {
+		let args: { [index: string]: any } = {
 			tags: '',
 			divHeight: 400,
 			startDate: '-1000',
@@ -61,7 +63,7 @@ export class TimelineProcessor {
 		}
 
 		let tagList: string[] = [];
-		args.tags.split(";").forEach(tag => parseTag(tag, tagList));
+		args.tags.split(";").forEach((tag: string) => parseTag(tag, tagList));
 		tagList.push(settings.timelineTag);
 
 		// Filter all markdown files to only those containing the tag list
@@ -72,7 +74,7 @@ export class TimelineProcessor {
 		}
 		// Keep only the files that have the time info
 		let timeline = document.createElement('div');
-		timeline.setAttribute('class', 'timeline');
+		timeline.setAttribute('class',styles['timeline']);
 		let timelineNotes = [] as AllNotesData;
 		let timelineDates = [];
 
@@ -80,6 +82,8 @@ export class TimelineProcessor {
 			// Create a DOM Parser
 			const domparser = new DOMParser();
 			const doc = domparser.parseFromString(await appVault.read(file), 'text/html');
+			let tagList = getNoteTags(file, fileCache);
+
 			let timelineData = doc.getElementsByClassName('ob-timelines');
 			for (let event of timelineData as any) {
 				if (!(event instanceof HTMLElement)) {
@@ -98,12 +102,12 @@ export class TimelineProcessor {
 					continue;
 				}
 				// if not title is specified use note name
-				let noteTitle = event.dataset.title ?? file.name.replace(/\.md$/g, '');
+				let noteTitle = event.dataset.title ?? file.name.slice(0, -3);
+				console.log('MARKUS event.dataset.class: ' + event.dataset.class);
 				let noteClass = event.dataset.class ?? "";
-				let notePath = event.dataset.path ?? '/' + file.path;
+				let notePath = '/' + file.path;
 				let type = event.dataset.type ?? "box";
 				let endDate = event.dataset.end ?? null;
-				let era = event.dataset.era ?? null;
 
 				if (!timelineNotes[noteId]) {
 					timelineNotes[noteId] = [];
@@ -116,12 +120,11 @@ export class TimelineProcessor {
 						class: noteClass,
 						type: type,
 						endDate: endDate,
-						era: era
+						tags: tagList
 					};
 					timelineDates.push(noteId);
 				} else {
-					// if note_id already present append to it
-					timelineNotes[noteId][timelineNotes[noteId].length] = {
+					let note = {
 						date: event.dataset.date,
 						title: noteTitle,
 						img: getImgUrl(appVault.adapter, event.dataset.img),
@@ -130,8 +133,15 @@ export class TimelineProcessor {
 						class: noteClass,
 						type: type,
 						endDate: endDate,
-						era: era
+						tags: tagList
 					};
+					// if note_id already present prepend or append to it
+					if (settings.sortDirection) {
+						timelineNotes[noteId].unshift(note);
+					} else {
+						timelineNotes[noteId].push(note);
+					}
+					console.debug("Repeat date: %o", timelineNotes[noteId]);
 				}
 			}
 		}
@@ -150,13 +160,9 @@ export class TimelineProcessor {
 			let eventCount = 0;
 			// Build the timeline html element
 			for (let date of timelineDates) {
-				let noteContainer = timeline.createDiv({ cls: 'timeline-container' });
-				let dateText = timelineNotes[date][0].date.replace(/-0*$/g, '').replace(/-0*$/g, '').replace(/-0*$/g, '');
-				if (timelineNotes[date][0].era) {
-					dateText = dateText.concat(' ' + timelineNotes[date][0].era)
-				}
-				let noteHeader = noteContainer.createEl('h2', { text: dateText });
-				let eventContainer = noteContainer.createDiv({ cls: 'timeline-event-list', attr: { 'style': 'display: block' } });
+				let noteContainer = timeline.createDiv({ cls: styles['timeline-container'] });
+				let noteHeader = noteContainer.createEl('h2', { text: timelineNotes[date][0].date.replace(/-0*$/g, '').replace(/-0*$/g, '').replace(/-0*$/g, '') });
+				let eventContainer = noteContainer.createDiv({ cls: styles['timeline-event-list'], attr: { 'style': 'display: block' } });
 
 				noteHeader.addEventListener('click', event => {
 					if (eventContainer.style.getPropertyValue('display') === 'none') {
@@ -168,11 +174,11 @@ export class TimelineProcessor {
 
 				if (eventCount % 2 == 0) {
 					// if its even add it to the left
-					noteContainer.addClass('timeline-left');
+					noteContainer.addClass(styles['timeline-left']);
 
 				} else {
 					// else add it to the right
-					noteContainer.addClass('timeline-right');
+					noteContainer.addClass(styles['timeline-right']);
 					noteHeader.setAttribute('style', 'text-align: right;');
 				}
 
@@ -181,22 +187,38 @@ export class TimelineProcessor {
 				}
 
 				for (let eventAtDate of timelineNotes[date]) {
-					let noteCard = eventContainer.createDiv({ cls: 'timeline-card' });
+					let noteCard = eventContainer.createDiv({ cls: styles['timeline-card'] });
 					// add an image only if available
 					if (eventAtDate.img) {
-						noteCard.createDiv({ cls: 'thumb', attr: { style: `background-image: url(${eventAtDate.img});` } });
+						noteCard.createDiv({ cls: styles['thumb'], attr: { style: `background-image: url(${eventAtDate.img});` } });
 					}
 					if (eventAtDate.class) {
 						noteCard.addClass(eventAtDate.class);
+						noteCard.addClass(styles['timeline-container']);
 					}
 
-					noteCard.createEl('article').createEl('h3').createEl('a',
+					noteCard.createEl('article', {
+						cls: 'dummy-class'
+					}).createEl('h3').createEl('a',
 						{
 							cls: 'internal-link',
 							attr: { href: `${eventAtDate.path}` },
-							text: eventAtDate.title
+							text: `${eventAtDate.title}`
 						});
-					noteCard.createEl('p', { text: eventAtDate.innerHTML });
+					let timlineTags = noteCard.createEl('p', {
+						cls: styles['timeline-tags']
+					});
+
+					for (let eventTag of eventAtDate.tags.filter((x) => !x.startsWith(settings.timelineTag))) {
+						timlineTags.appendChild(noteCard.createEl('a', {
+							cls: 'tag ' + styles['timeline-tag'],
+							text: '#' + eventTag,
+							href: '#' + eventTag,
+							title: 'click to search for other pages using this tag',
+							attr: { target: '_blank' }
+						}));
+					}
+					noteCard.createEl('p', { cls: styles['timeline-paragraph'], text: eventAtDate.innerHTML });
 				}
 				eventCount++;
 			}
@@ -206,30 +228,56 @@ export class TimelineProcessor {
 			return;
 		}
 
+		console.log('MARKUS timevis?: '+visTimeline);
+
 		// Create a DataSet
 		let items = new DataSet([]);
 
+		console.log('MARKUS timelineDates: '+timelineDates.toString);
+		
+
 		timelineDates.forEach(date => {
+
+			console.log('MARKUS using?: '+date);
 
 			// add all events at this date
 			Object.values(timelineNotes[date]).forEach(event => {
+
+				console.log('MARKUS event to this date?: '+event.title??event.path);
+
 				// Create Event Card
 				let noteCard = document.createElement('div');
-				noteCard.className = 'timeline-card';
+				noteCard.className = styles['timeline-card'];
 				// add an image only if available
 				if (event.img) {
-					noteCard.createDiv({ cls: 'thumb', attr: { style: `background-image: url(${event.img});` } });
+					noteCard.createDiv({ cls: styles['thumb'], attr: { style: `background-image: url(${event.img});` } });
 				}
 				if (event.class) {
 					noteCard.addClass(event.class);
+					//noteCard.addClass(styles['timeline-card']);
 				}
 
 				noteCard.createEl('article').createEl('h3').createEl('a', {
 					cls: 'internal-link',
 					attr: { href: `${event.path}` },
-					text: event.title
+					text: `${event.title}`
 				});
-				noteCard.createEl('p', { text: event.innerHTML });
+
+				let timlineTags = noteCard.createEl('p', {
+					cls: styles['timeline-tags']
+				});
+
+				for (let eventTag of event.tags.filter((x) => !x.startsWith(settings.timelineTag))) {
+					timlineTags.appendChild(noteCard.createEl('a', {
+						cls: 'tag ' + styles['timeline-tag'],
+						text: '#' + eventTag,
+						href: '#' + eventTag,
+						title: '#' + eventTag,
+						attr: { target: '_blank' }
+					}));
+				}
+
+				noteCard.createEl('p', { cls: styles['timeline-paragraph'], text: event.innerHTML });
 
 				let startDate = event.date?.replace(/(.*)-\d*$/g, '$1');
 				let start, end;
@@ -251,10 +299,12 @@ export class TimelineProcessor {
 				}
 
 				if (start.toString() === 'Invalid Date') {
+					console.log('MARKUS invalid date');
 					return;
 				}
 
 				if ((event.type === "range" || event.type === "background") && end.toString() === 'Invalid Date') {
+					console.log('MARKUS range,bg,end');
 					return;
 				}
 
@@ -268,14 +318,15 @@ export class TimelineProcessor {
 					type: event.type,
 					end: end ?? null
 				});
+				console.log('MARKUS added event; size is now: ' + items.length);
 			});
 		});
 
 		// Configuration for the Timeline
 		let options = {
 			minHeight: +args.divHeight,
-			showCurrentTime: false,
-			showTooltips: false,
+			showCurrentTime: true,
+			showTooltips: true,
 			template: function (item: any) {
 
 				let eventContainer = document.createElement('div');
@@ -283,7 +334,8 @@ export class TimelineProcessor {
 				let eventCard = eventContainer.createDiv();
 				eventCard.outerHTML = item.title;
 				eventContainer.addEventListener('click', event => {
-					let el = (eventContainer.getElementsByClassName('timeline-card')[0] as HTMLElement);
+					let el = (eventContainer.getElementsByClassName(styles['timeline-card'])[0] as HTMLElement);
+					console.log('MARKUS:: timeline-card: ',el,);
 					el.style.setProperty('display', 'block');
 					el.style.setProperty('top', `-${el.clientHeight + 10}px`);
 				});
@@ -296,10 +348,13 @@ export class TimelineProcessor {
 		};
 
 		// Create a Timeline
-		timeline.setAttribute('class', 'timeline-vis');
+		console.log('MARKUS:: setattributes ',timeline,);
+		timeline.setAttribute('class', ' vis-timeline ' + styles['timeline-vis']);
+		console.log('MARKUS:: creating object Timeline ',timeline,items,options);
 		new Timeline(timeline, items, options);
 
 		// Replace the selected tags with the timeline html
 		el.appendChild(timeline);
+		console.log('MARKUS:: FIN ');
 	}
 }

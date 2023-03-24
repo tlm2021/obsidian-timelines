@@ -4,6 +4,8 @@ import { TimelinesSettingTab } from './settings';
 import { TimelineProcessor } from './block';
 import { Plugin, MarkdownView } from 'obsidian';
 
+import './styles.css';
+
 export default class TimelinesPlugin extends Plugin {
 	settings: TimelinesSettings;
 
@@ -13,20 +15,20 @@ export default class TimelinesPlugin extends Plugin {
 		console.log('Loaded Timelines Plugin');
 
 		// Register timeline block renderer
-		this.registerMarkdownCodeBlockProcessor('timeline', async (source, el, ctx) => {
+		this.registerMarkdownCodeBlockProcessor(this.settings.timelineTag, async (source, el, ctx) => {
 			const proc = new TimelineProcessor();
 			await proc.run(source, el, this.settings, this.app.vault.getMarkdownFiles(), this.app.metadataCache, this.app.vault, false);
 		});
 
 		// Register vis-timeline block renderer
-		this.registerMarkdownCodeBlockProcessor('timeline-vis', async (source, el, ctx) => {
+		this.registerMarkdownCodeBlockProcessor(this.settings.timelineTag + '-vis', async (source, el, ctx) => {
 			const proc = new TimelineProcessor();
 			await proc.run(source, el, this.settings, this.app.vault.getMarkdownFiles(), this.app.metadataCache, this.app.vault, true);
 		});
 
 		this.addCommand({
-			id: "render-timeline",
-			name: "Render Timeline",
+			id: "render-" + this.settings.timelineTag,
+			name: "Render Timeline (" + this.settings.timelineTag + ")",
 			callback: async () => {
 				const proc = new TimelineProcessor();
 				let view = this.app.workspace.getActiveViewOfType(MarkdownView);
